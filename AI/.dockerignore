@@ -1,0 +1,17 @@
+# python-service/.dockerignore
+
+# 忽略 Python 虚拟环境
+.venv
+venv
+
+# 忽略 Python 缓存文件
+__pycache__/
+*.pyc
+*.pyo
+
+# 忽略开发环境相关文件
+.env
+.DS_Store
+
+# 忽略 Git 目录
+.git

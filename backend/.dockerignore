@@ -1,0 +1,14 @@
+# backend/.dockerignore
+
+# 忽略 node_modules，因为我们会在容器内安装
+node_modules
+
+# 忽略 npm 的调试日志
+npm-debug.log
+
+# 忽略开发环境相关文件
+.env
+.DS_Store
+
+# 忽略 Git 目录
+.git
