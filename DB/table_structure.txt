@@ -1,0 +1,38 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE users (
+    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- 成功使用 UUID
+    user_name VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,   -- 修正拼字：timestampz -> timestamptz
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP    -- 修正：刪除結尾的逗號
+);
+
+CREATE TABLE characters (
+    character_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- 改善建議 3
+    character_name VARCHAR(50) NOT NULL,
+    gender VARCHAR(20),
+    species VARCHAR(50),
+    description TEXT,
+    style VARCHAR(100),
+    character_photo_link VARCHAR(255),
+    character_looks_link VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE memory_balls (
+    mb_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id INT NOT NULL REFERENCES characters(character_id) ON DELETE CASCADE,
+    memory_title TEXT NOT NULL,
+    character_look_link VARCHAR(255) NOT NULL,
+    memory_content TEXT,
+    style VARCHAR(100),
+    mb_photo_link VARCHAR(255),
+    mb_image_link VARCHAR(255) NOT NULL,
+    memory_emotion VARCHAR(20) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, -- 改善建議 2
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+
+);
