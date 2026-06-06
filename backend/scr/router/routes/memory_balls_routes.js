@@ -1,15 +1,17 @@
 const express = require('express');
+const upload = require('../middlewares/upload_middleware');
+const verifyToken = require('../middlewares/auth');
 const memoryBallsController = require('../controllers/memory_balls_controller');
 const memoryBallsRouter = express.Router();
 
-memoryBallsRouter.get('/list', memoryBallsController.getMemoryBallList);
+memoryBallsRouter.get('/', verifyToken, memoryBallsController.getMemoryBallList);
 
-memoryBallsRouter.post('/create', memoryBallsController.createMemoryBall);
+memoryBallsRouter.post('/:character_id', verifyToken, upload.single('memory_ball_photo'), memoryBallsController.createMemoryBall);
 
-memoryBallsRouter.get('/:id', memoryBallsController.getMemoryBall);
+memoryBallsRouter.get('/:memory_ball_id', verifyToken, memoryBallsController.getMemoryBall);
 
-memoryBallsRouter.delete('/:id', memoryBallsController.deleteMemoryBall);
+memoryBallsRouter.delete('/:memory_ball_id', verifyToken, memoryBallsController.deleteMemoryBall);
 
-memoryBallsRouter.patch('/update/:id', memoryBallsController.updateMemoryBall);
+memoryBallsRouter.patch('/actions/:memory_ball_id', verifyToken, upload.single('memory_ball_photo'), memoryBallsController.updateMemoryBall);
 
 module.exports = memoryBallsRouter;

@@ -1,15 +1,19 @@
 const express = require('express');
+const upload = require('../middlewares/upload_middleware');
+const verifyToken = require('../middlewares/auth');
 const charactersController = require('../controllers/characters_controller');
 const charactersRouter = express.Router();
 
-charactersRouter.get('/list', charactersController.getCharacterList);
+charactersRouter.get('/', verifyToken, charactersController.getCharacterList);
 
-charactersRouter.post('/create', charactersController.createCharacter);
+charactersRouter.post('/', verifyToken, upload.single('character_photo'), charactersController.createCharacter);
 
-charactersRouter.get('/:id', charactersController.getCharacter);
+charactersRouter.get('/:character_id', verifyToken, charactersController.getCharacter);
 
-charactersRouter.delete('/:id', charactersController.deleteCharacter);
+charactersRouter.delete('/:character_id', verifyToken, charactersController.deleteCharacter);
 
-charactersRouter.patch('/update/:id', charactersController.updateCharacter);
+charactersRouter.patch('/actions/:character_id', verifyToken, upload.single('character_photo'), charactersController.updateCharacter);
 
 module.exports = charactersRouter;
+
+//testing mock ai gen link: https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png

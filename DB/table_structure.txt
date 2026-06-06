@@ -1,38 +1,67 @@
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- 0. 啟用 UUID 自動生成擴充功能（若尚未啟用）
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- ========================================================
+-- 1. 建立使用者資料表 (users)
+-- ========================================================
 CREATE TABLE users (
-    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- 成功使用 UUID
-    user_name VARCHAR(50) NOT NULL UNIQUE,
+    user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_name VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,   -- 修正拼字：timestampz -> timestamptz
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP    -- 修正：刪除結尾的逗號
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE NOT NULL
 );
 
+-- ========================================================
+-- 2. 建立角色資料表 (characters)
+-- ========================================================
 CREATE TABLE characters (
-    character_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- 改善建議 3
+    character_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     character_name VARCHAR(50) NOT NULL,
-    gender VARCHAR(20),
+    gender VARCHAR(50),
     species VARCHAR(50),
     description TEXT,
-    style VARCHAR(100),
-    character_photo_link VARCHAR(255),
-    character_looks_link VARCHAR(255) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    character_photo_link TEXT,
+    character_looks_link TEXT,
+    user_id UUID NOT NULL, -- 外鍵：屬於哪位使用者
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    style VARCHAR(50),
+    is_deleted BOOLEAN DEFAULT FALSE NOT NULL,
+    
+    -- 設定外鍵約束與級聯刪除
+    CONSTRAINT fk_user
+        FOREIGN KEY (user_id) 
+        REFERENCES users(user_id) 
+        ON DELETE CASCADE
 );
 
+-- ========================================================
+-- 3. 建立記憶球資料表 (memory_balls)
+-- ========================================================
 CREATE TABLE memory_balls (
-    mb_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id INT NOT NULL REFERENCES characters(character_id) ON DELETE CASCADE,
-    memory_title TEXT NOT NULL,
-    character_look_link VARCHAR(255) NOT NULL,
-    memory_content TEXT,
-    style VARCHAR(100),
-    mb_photo_link VARCHAR(255),
-    mb_image_link VARCHAR(255) NOT NULL,
-    memory_emotion VARCHAR(20) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, -- 改善建議 2
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    mb_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    mb_title TEXT NOT NULL,
+    mb_content TEXT,
+    mb_emotion VARCHAR(50)[] NOT NULL, -- 💡 支援陣列格式 (例如：['joy', 'sadness'])
+    character_id UUID,                 -- 外鍵：關聯的角色 (Nullable，可能不屬於特定角色)
+    user_id UUID NOT NULL,             -- 外鍵：屬於哪位使用者
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    style VARCHAR(50),
+    mb_photo_link TEXT,
+    mb_image_link TEXT,
+    is_deleted BOOLEAN DEFAULT FALSE NOT NULL,
 
+    -- 設定外鍵約束
+    CONSTRAINT fk_mb_character
+        FOREIGN KEY (character_id) 
+        REFERENCES characters(character_id) 
+        ON DELETE SET NULL, -- 如果角色被刪除了，記憶球保留，但此欄位設為 NULL
+        
+    CONSTRAINT fk_mb_user
+        FOREIGN KEY (user_id) 
+        REFERENCES users(user_id) 
+        ON DELETE CASCADE
 );

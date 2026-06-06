@@ -13,3 +13,7 @@ optimize controller and test with mock data
 ### 2 Jun 2026
 
 conpleted all controller with mock data. Successfully connect user controller to the database in aws rds.
+
+### 3 Jun 2026
+
+connected database from aws rds with all controllers. Successfully connect to S3 and manage the image in there

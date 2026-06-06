@@ -1,5 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
+
 const usersRouter = require('./router/routes/users_routes');
 const charactersRouter = require('./router/routes/characters_routes');
 const memoryBallsRouter = require('./router/routes/memory_balls_routes');
@@ -7,6 +9,7 @@ const memoryBallsRouter = require('./router/routes/memory_balls_routes');
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const PORT = 3000;
 
