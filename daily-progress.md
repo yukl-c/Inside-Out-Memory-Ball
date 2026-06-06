@@ -17,3 +17,7 @@ conpleted all controller with mock data. Successfully connect user controller to
 ### 3 Jun 2026
 
 connected database from aws rds with all controllers. Successfully connect to S3 and manage the image in there
+
+### 6 Jun 2026
+
+added jwt generator and verifier for user authentication. Use token to identify user. Backend finally done.
