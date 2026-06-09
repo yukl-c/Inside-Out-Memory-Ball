@@ -26,4 +26,4 @@ model_name_gen_text = 'gemini-3.1-flash-image-preview'
 
 # test = "test"
 
-print(GOOGLE_API_KEY)
+# print(api_key)

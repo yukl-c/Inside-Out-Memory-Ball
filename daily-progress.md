@@ -21,3 +21,7 @@ connected database from aws rds with all controllers. Successfully connect to S3
 ### 6 Jun 2026
 
 added jwt generator and verifier for user authentication. Use token to identify user. Backend finally done.
+
+### 9 Jun 2026
+
+finally configure the gemini api key, model names for Flask to call for gemini
