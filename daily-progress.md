@@ -25,3 +25,11 @@ added jwt generator and verifier for user authentication. Use token to identify 
 ### 9 Jun 2026
 
 finally configure the gemini api key, model names for Flask to call for gemini
+
+### 11-12 Jun 2026
+
+adjust the prompt and setting of calling gemini
+
+### 13 Jun 2026
+
+added bcypt in user_controller, completed the update of the prompt

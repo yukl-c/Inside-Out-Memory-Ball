@@ -1,18 +1,19 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 const successMessage = require('../utils/status_messages').successMessage;
 const errorMessage = require('../utils/status_messages').errorMessage;
 
 // ➕ 1. 用戶註冊
 async function register (req, res) {
-    const { name, pwd, confirm_pwd } = req.body;
+    const { name, password, confirm_password } = req.body;
 
     // 🔒 400 食材安檢（記得加上 return 阻斷！）
-    if (!name || !pwd || !confirm_pwd) {
+    if (!name || !password || !confirm_password) {
         return errorMessage(res, 400, "用戶建立失敗：缺少 name，password 或 confirm password 欄位");
     }
 
-    if (pwd !== confirm_pwd) {
+    if (password !== confirm_password) {
         return errorMessage(res, 400, "用戶建立失敗：password 和 confirm password 欄位内容不一致");
     }
 
@@ -25,11 +26,14 @@ async function register (req, res) {
             return errorMessage(res, 400, "用戶建立失敗：該用戶名稱已被註冊");
         }
 
+        const hashedPassword = bcrypt.hashSync(password, 10);
+        console.log(`hashed password: ${hashedPassword}`);
+
         const sql = `INSERT INTO users (user_name, password)
                      VALUES ($1, $2)
                      RETURNING user_id, user_name, created_at, updated_at`;
 
-        const params = [name, pwd];
+        const params = [name, hashedPassword];
         const result = await db.query(sql, params);
 
         return successMessage(res, 201, "用戶建立成功", result.rows[0]);
@@ -41,37 +45,43 @@ async function register (req, res) {
 
 // 🔑 2. 用戶登入
 async function login (req, res) {
-    const { name, pwd } = req.body;
-    console.log(`name: ${name}, pwd: ${pwd}`);
+    const { name, password } = req.body;
+    console.log(`name: ${name}, password: ${password}`);
 
-    if (!name || !pwd) {
+    if (!name || !password) {
         return errorMessage(res, 400, "登入失敗： 缺少 name 或 password 欄位");
     }
 
     try {
-        const loginSql = `SELECT * FROM users WHERE user_name = $1 AND password = $2`; 
-        const loginParams = [name, pwd];
+        const loginSql = `SELECT * FROM users WHERE user_name = $1`; 
+        const loginParams = [name];
         const loginResult = await db.query(loginSql, loginParams);
         console.log(loginResult.rows)
-        const currentUserId = loginResult.rows[0].user_id;
+        // const currentUserId = loginResult.rows[0].user_id;
         
         if (loginResult.rows.length > 0) {
-            // 在這裡發放 Token
-            const userId = loginResult.rows[0].user_id;
-            const token = jwt.sign(
-                { userId: currentUserId }, 
-                process.env.JWT_SECRET, 
-                { expiresIn: '2h' }
-            );
+            const hashedPassword = loginResult.rows[0].password;
+            const isMatch = bcrypt.compareSync(password, hashedPassword);
+            if (isMatch) {
+                // 在這裡發放 Token
+                const currentUserId = loginResult.rows[0].user_id;
+                const token = jwt.sign(
+                    { userId: currentUserId }, 
+                    process.env.JWT_SECRET, 
+                    { expiresIn: '2h' }
+                );
 
-            const exist_user = loginResult.rows[0]
-            console.log('token: ', token);
-            return successMessage(res, 200, "登入成功", { 
-                userId: exist_user.user_id, 
-                token: token 
-            });
+                const exist_user = loginResult.rows[0]
+                console.log('token: ', token);
+                return successMessage(res, 200, "登入成功", { 
+                    userId: exist_user.user_id, 
+                    token: token 
+                });
+            } else {
+                return errorMessage(res, 400, "登入失敗： 錯誤用戶密碼");
+            }
         } else {
-            return errorMessage(res, 400, "登入失敗： 錯誤用戶名稱或密碼");
+            return errorMessage(res, 400, "登入失敗： 錯誤用戶名稱");
         }
     } catch (error) {
         console.error("【資料庫註冊錯誤報告】:", error);
@@ -124,15 +134,15 @@ async function deleteUser (req, res) {
 
 // ✏️ 5. 更新密碼
 async function updatePassword (req, res) {
-    const {old_pwd, new_pwd, confirm_pwd } = req.body; 
+    const {old_password, new_password, confirm_password } = req.body; 
     const currentUserId = req.user.userId;
     console.log(`user id: ${currentUserId}`);
 
-    if (!old_pwd || !new_pwd || !confirm_pwd) {
+    if (!old_password || !new_password || !confirm_password) {
         return errorMessage(res, 400, "用戶更改密碼失敗：缺少必要欄位");
     }
 
-    if (new_pwd !== confirm_pwd) {
+    if (new_password !== confirm_password) {
         return errorMessage(res, 400, "用戶更改密碼失敗：新密碼與確認密碼不一致");
     }
 
@@ -143,16 +153,27 @@ async function updatePassword (req, res) {
             return errorMessage(res, 404, `找不到 ID 為 ${currentUserId} 的用戶`);
         }
         
-        if (checkResult.rows[0].password != old_pwd) {
-            return errorMessage(res, 404, `舊密碼錯誤`)
+        // if (checkResult.rows[0].password != old_password) {
+        //     return errorMessage(res, 404, `舊密碼錯誤`)
+        // }
+
+        const PreviousHashedPassword = checkResult.rows[0].password;
+
+        const isMatch = bcrypt.compareSync(password, PreviousHashedPassword);
+        
+        if (!isMatch) {
+            return errorMessage(res, 404, `舊密碼錯誤`);
         }
 
-        const updatePwdSQL = `UPDATE users
+        const newHashedPassword = bcrypt.hashSync(new_password, 10);
+        console.log(`new hashed password: ${newHashedPassword}`);
+
+        const updatepasswordSQL = `UPDATE users
                      SET password = $1
                      WHERE user_id = $2`;
                     
-        const updatePwdParams = [new_pwd, currentUserId];
-        const updatePwdResult = await db.query(updatePwdSQL, updatePwdParams);             
+        const updatepasswordParams = [newHashedPassword, currentUserId];
+        const updatepasswordResult = await db.query(updatepasswordSQL, updatepasswordParams);             
         return successMessage(res, 200, "用戶更改密碼成功");
     } catch (error) {
         console.error("【資料庫註冊錯誤報告】:", error);

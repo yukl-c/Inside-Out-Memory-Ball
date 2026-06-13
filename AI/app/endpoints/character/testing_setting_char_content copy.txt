@@ -1,0 +1,8 @@
+## 1
+{
+    "character_name":"Yul",
+    "gender":"Non-binary",
+    "species":"Furry",
+    "style":"Pokemon",
+    "description":"A white lion with light-blue mane, red eyes, silver claws, standing with two feet and wearing a navy cloak"
+}

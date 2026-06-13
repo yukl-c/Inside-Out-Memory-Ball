@@ -4,14 +4,15 @@ import google.genai as genai
 
 load_dotenv()
 
-api_key = os.getenv("API_KEY") # 'AQ.Ab8RN6Ikmpf452zTGRimjueB8RuFhc5d1vV58oGSDhnPzXoQNQ'
+api_key = "AQ.Ab8RN6J-qIjg_Vz_0Pog_IbuDGlf_0Gg6xAe45HEgljq-Ak8Hg"
+# os.getenv("API_KEY") # 'AQ.Ab8RN6Ikmpf452zTGRimjueB8RuFhc5d1vV58oGSDhnPzXoQNQ'
 
-# client = genai.Client(api_key= os.getenv("API_KEY"))
+client = genai.Client(api_key= os.getenv("API_KEY"))
 
 # Example usage for generating content
 model_name_gen_text = 'gemini-2.5-flash'
 
-model_name_gen_text = 'gemini-3.1-flash-image-preview'
+model_name_gen_image = 'gemini-2.5-flash-image' # 'gemini-3.1-flash-image-preview'
 
 # response = client.models.generate_content(
 #     model='gemini-2.5-flash',
