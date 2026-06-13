@@ -1,9 +1,9 @@
 import os
 import sys
 import base64
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify
 from google import genai
-import google.genai as genai, types
+from google.genai import types # Corrected import structure
 
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -14,30 +14,28 @@ from config import api_key, client, model_name_gen_image
 
 print(api_key)
 
+# FIXED: Initialize the Flask app so @app.route works
+app = Flask(__name__)
+
 @app.route('/api/generate-memory-ball-image', methods=['POST'])
 def generate_character_text():
     # 1. 接收前端 Form / Input Fields 的資料
-    # 假設前端發送的是 JSON Map
     data = request.json
 
-    # 給 Nano Banana 2 的系統特質約束 (System Prompt)
-    # 重點在於確立「藝術風格」與「畫面邊界」
     title = data.get('title', 'unknown')
     scene_prompt = data.get('scene_prompt', '')
     emotions = data.get('emotion', {})
     character_image = data.get('character_image', None)
-    user_sketch_base64 = data.get('user_sketch_base64', None) # 格式需為純 Base64 字串，不含 data:image/jpeg;base64,
+    user_sketch_base64 = data.get('user_sketch_base64', None) 
 
-    # 給 Nano Banana 2 的系統特質約束 (System Prompt)
-    # 重點在於確立「藝術風格」與「畫面邊界」，直接呈現開放式場景
-   system_prompt = """
+    # FIXED: Corrected indentation (4 spaces) to prevent IndentationError
+    system_prompt = """
     You are an expert concept artist and psychological visualization engine. 
     Your primary goal is to bring human memories to life through clean, immersive, full-screen narrative scenes. 
     You must always ensure the character matching the provided reference image remains perfectly consistent in features, hair, and essence within the scene.
     The artwork must be beautiful and expressive, focusing strictly on realistic or stylized environment elements. Do not overlay any abstract emotional visual effects, magical energy, floating mist, or dark smoke on top of the scene.
     """
 
-    # 結合 API 3 成果與繪圖指令的 User Prompt
     user_text_prompt = f"""
     Render the following vivid memory scene as a clean, direct cinematic artwork:
 
@@ -55,27 +53,30 @@ def generate_character_text():
     - If a reference sketch image is attached to this request, you MUST strictly adhere to its core composition and silhouette, elevating it to professional artistic quality.
     """
 
-    # 4. 建構給 Gemini SDK 的 Part 列表 (動態加入圖片)
-    # 預設先把文字放進去
+    # 4. 建構給 Gemini SDK 的 Part 列表
     contents_parts = [
-        types.Part.from_text(text=user_text_prompt),
-        types.Part.from_bytes(
-                data=character_image,
-                mime_type="image/png" # 或是 image/jpeg
-        )
+        types.Part.from_text(text=user_text_prompt)
     ]
     
-    # 如果用家有畫畫，將用家畫的圖片 (Base64) 作為第二個 Part 塞進去
+    # FIXED: Added a check for character_image and decoded the base64 string to bytes
+    if character_image:
+        contents_parts.append(
+            types.Part.from_bytes(
+                data=base64.b64decode(character_image),
+                mime_type="image/png" 
+            )
+        )
+
+    # FIXED: Decoded the base64 string to bytes
     if user_sketch_base64:
         contents_parts.append(
             types.Part.from_bytes(
-                data=user_sketch_base64,
-                mime_type="image/png" # 或是 image/jpeg
+                data=base64.b64decode(user_sketch_base64),
+                mime_type="image/png"
             )
         )
 
     try:
-        # 呼叫 Nano Banana 2 製造圖片
         response = client.models.generate_content(
             model=model_name_gen_image,
             contents=contents_parts,
@@ -86,19 +87,14 @@ def generate_character_text():
             )
         )
 
-        # 🎯 正確提取 Nano Banana 2 生成的圖片位元組 (Bytes)
-        # 圖片模型的影像資料直接藏在第一個 part 的 inline_data 中
         image_bytes = response.candidates[0].content.parts[0].inline_data.data
-        
-        # 將二進位圖片編碼為 Base64 字串，方便存入 DB (character_looks_link) 與回傳前端
         
         image_base64 = base64.b64encode(image_bytes).decode('utf-8')
         image_data_uri = f"data:image/png;base64,{image_base64}"
 
-        # 回傳標準結構化 JSON 供前端 `<img src="...">` 直接讀取顯示
         return jsonify({
             "status": "success",
-            "character_looks_link": image_data_uri  # 這就是你需要的正面+背面 Base64 連結
+            "character_looks_link": image_data_uri 
         })
 
     except Exception as e:
@@ -106,3 +102,7 @@ def generate_character_text():
             "status": "error",
             "message": str(e)
         }), 500
+
+# Optional: Add standard execution block for local testing
+if __name__ == '__main__':
+    app.run(port=5000, debug=True)

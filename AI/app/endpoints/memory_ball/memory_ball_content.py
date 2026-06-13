@@ -39,15 +39,27 @@ def generate_character_text():
 
     Output Format:
     {
-    "title": "A short, meaningful summary title of the scene...",
-    "scene_prompt": "A vivid, clear, and highly detailed natural language scene description enclosed inside a scene...",
-    "emotions": {
-        "Joy": 70,
-        "Sadness": 0,
-        "Anger": 10,
-        "Disgust": 0,
-        "Fear": 20
-        }
+    "title": "A Painful Wobble and Wounded Knee", 
+    "scene_prompt": "Inside a
+    translucent, glowing spherical memory orb, a young cub-like version of Yul,
+    matching the distinct light blue mane, white fur, and red eyes from image_0.png
+    but with softer, more rounded features, is depicted in a moment of distress. The
+    memory shows him wearing a smaller, child-sized blue cloak trimmed in gold,
+    similar to the one in image_0.png, but slightly askew and dusty. He is sitting
+    directly on cracked, gray playground asphalt, clutching his right knee, where a
+    tiny, visible red scrape shows through his white fur. His face is crumpled in
+    genuine emotional and physical pain, wide red eyes streaming with tears and his
+    mouth open mid-cry, showing small, sharp teeth. His small front paws are stained
+    with dust from trying to catch himself. Just to his left, a bright red,
+    classic-style children’s bicycle lies sideways, its front wheel slightly bent
+    and still slowly turning, its pedals twisted. The background is a gently
+    blurred, sunlit elementary school playground, with indistinct green metal
+    equipment and yellow safety surface. The atmosphere within the orb is heavy with
+    the warm, dusty light of late afternoon and the sharp sting of sudden pain and
+    shock. The overall style is clear digital illustration, capturing the
+    character’s specific look, scaled to a young age.", 
+    "emotions": { "Joy": 5,
+    "Sadness": 60, "Anger": 15, "Disgust": 0, "Fear": 20 } 
     }
     """
 
