@@ -12,14 +12,8 @@ from config import api_key, client, model_name_gen_text
 
 print(api_key)
 
-@app.route('/api/generate-memory-ball-text', methods=['POST'])
-def generate_character_text():
-    data = request.json
-    
-    character_name = data.get('character_name', 'Unknown')
-    character_image = data.get('character_image', None)
-    content = data.get('description', '')
-    user_sketch_base64 = data.get('user_sketch_base64', None) # 格式需為純 Base64 字串，不含 data:image/jpeg;base64,
+
+def post_memory_ball_text(character_name, character_image_link, content, user_sketch_base64):
 
     # 2. 定義完整的 System Prompt (全部英文)
     system_prompt = """
@@ -75,7 +69,7 @@ def generate_character_text():
     contents_parts = [
         types.Part.from_text(text=user_text_prompt),
         types.Part.from_bytes(
-                data=character_image,
+                data=character_image_link,
                 mime_type="image/png" # 或是 image/jpeg
         )
     ]

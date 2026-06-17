@@ -3,6 +3,7 @@ const { uploadToS3, uploadAiUrlToS3, deleteFromS3 } = require('../config/s3');
 const successMessage = require('../utils/status_messages').successMessage;
 const errorMessage = require('../utils/status_messages').errorMessage;
 
+
 // 🔄 輔助函式：檢查記憶球是否存在
 async function checkMemoryball(memoryBallId, userId) {
     try {
@@ -18,9 +19,97 @@ async function checkMemoryball(memoryBallId, userId) {
     }
 }
 
+// 創建記憶球圖片描述
+async function createMemoryBallContentText (character_name, character_image_link, content, user_sketch_base64) {
+    try {
+        const response = await fetch(
+            'http://localhost:5000/api/generate-memory-ball-text',
+            {
+                character_name: character_name, 
+                character_image_link: character_image_link, 
+                content: content, 
+                user_sketch_base64: user_sketch_base64
+            }
+        );
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
+// 創建記憶球圖片
+async function createMemoryBallImage (title, scene_prompt, emotions, character_image_link, user_sketch_base64) {
+    try {
+        const response = await fetch(
+            'http://localhost:5000/api/generate-memory-ball-image',
+            {
+                title: title, 
+                scene_prompt: scene_prompt, 
+                emotions: emotions, 
+                character_image_link: character_image_link, 
+                user_sketch_base64: user_sketch_base64
+            }
+        );
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
+// 創建記憶球場景
+async function createMemoryBallScene (req, res) {
+    const { character_name, character_image_link, content, user_sketch_base64 } = req.body;
+
+    if (!character_name) {
+        return errorMessage(res, 400, '創建 Memory Ball 失敗：缺少 character_id 必填欄位');
+    }
+
+    if (!character_image_link) {
+        return errorMessage(res, 400, '創建 Memory Ball 失敗：必須提供 Gemini AI 圖片網址 (character_image_link_link)');
+    }
+
+    try {
+        const textServiceResult = await createMemoryBallContentText(character_name, character_image_link, content, user_sketch_base64);
+
+        if (textServiceResult.status !== 'success') {
+            return errorMessage(res, 522, 'Flask AI 文字生成微服務回應異常', textServiceResult.message);
+        }
+
+        const aiPromptTextData = JSON.parse(textServiceResult.data);
+        const scenePrompt = aiPromptTextData.scene_prompt
+        const sceneTitle = aiPromptTextData.title
+        const sceneEmotions = aiPromptTextData.emotions
+
+        const imageServiceResult = await createCharacterImage(characterPrompt, user_sketch_base64)
+
+        if (imageServiceResult.status !== 'success') {
+            return errorMessage(res, 522, 'Flask AI 圖片生成微服務回應異常', imageServiceResult.message);
+        }
+
+        const aiPromptImageData = JSON.parse(imageServiceResult.data);
+        const sceneLink = aiPromptImageData.character_looks_link;
+
+        return successMessage(res, 201, 'Flask AI 圖片生成微服務成功', {
+            title: sceneTitle,
+            emotions: sceneEmotions,
+            scene_link: sceneLink
+        }); 
+
+    } catch (error) {
+        console.error(error);
+        return errorMessage(res, 500, 'Memory ball scene creation failed', error.message);
+    }
+}
+
 // ➕ 1. 創建記憶球
 async function createMemoryBall (req, res) {  
-    const { mb_title, mb_content, mb_emotion, ai_generated_url, style } = req.body;
+    const { mb_title, mb_content, mb_emotion, character_image_link, style } = req.body;
     const character_id = req.params.character_id;
     const currentUserId = req.user.userId;
     console.log('character id: ', character_id, " , user id: ", currentUserId);
@@ -47,8 +136,8 @@ async function createMemoryBall (req, res) {
     }
 
 
-    if (!ai_generated_url) {
-        return errorMessage(res, 400, '創建 Memory Ball 失敗：必須提供 Gemini AI 圖片網址 (ai_generated_url)');
+    if (!character_image_link) {
+        return errorMessage(res, 400, '創建 Memory Ball 失敗：必須提供 Gemini AI 圖片網址 (character_image_link_link)');
     }
 
     // 預先宣告救援與清理用的 S3 Key 變數
@@ -68,7 +157,7 @@ async function createMemoryBall (req, res) {
         
         // 🤖 流程 B：處理絕對存在的 Gemini AI 圖片網址，將其轉存至 S3
         console.log("🤖 啟動記憶球 AI 網址轉存 S3 流程...");
-        const memoryBallImageS3Result = await uploadAiUrlToS3(ai_generated_url, 'memory-ball-image');
+        const memoryBallImageS3Result = await uploadAiUrlToS3(character_image_link_link, 'memory-ball-image');
         memoryBallImageLink = memoryBallImageS3Result.imageUrl;
         uploadedNewImageS3Key = memoryBallImageS3Result.s3Key; // 紀錄新 Key 備用
         
@@ -149,7 +238,7 @@ async function getMemoryBall (req, res) {
 async function updateMemoryBall (req, res) {
     const currentUserId = req.user.userId;
     const memoryBallId = req.params.memory_ball_id; // 💡 統一使用路由參數名稱
-    const { mb_title, mb_content, mb_emotion, character_id, ai_generated_url, style } = req.body;
+    const { mb_title, mb_content, mb_emotion, character_id, character_image_link_link, style } = req.body;
 
     console.log("📥 收到更新記憶球請求:", { memoryBallId, ...req.body });
 
@@ -157,8 +246,8 @@ async function updateMemoryBall (req, res) {
     if (!mb_title || !mb_emotion || !character_id || !memoryBallId) {
         return errorMessage(res, 400, '更新 Memory Ball 失敗：缺少必填欄位');
     }
-    if (!ai_generated_url) {
-        return errorMessage(res, 400, '更新 Memory Ball 失敗：必須提供 Gemini AI 圖片網址 (ai_generated_url)');
+    if (!character_image_link_link) {
+        return errorMessage(res, 400, '更新 Memory Ball 失敗：必須提供 Gemini AI 圖片網址 (character_image_link_link)');
     }
 
     // 預先宣告這一次「新上傳成功」的 S3 Key (救援與擦屁股用)
@@ -201,7 +290,7 @@ async function updateMemoryBall (req, res) {
 
         // 🤖 步驟 3：處理最新的 Gemini AI 圖片網址並轉存
         console.log("🤖 啟動新記憶球 AI 網址轉存 S3...");
-        const memoryBallImageS3Result = await uploadAiUrlToS3(ai_generated_url, 'memory-ball-image');
+        const memoryBallImageS3Result = await uploadAiUrlToS3(character_image_link_link, 'memory-ball-image');
         memoryBallImageLink = memoryBallImageS3Result.imageUrl;
         uploadedNewImageS3Key = memoryBallImageS3Result.s3Key;
 
@@ -288,6 +377,7 @@ async function deleteMemoryBall (req, res) {
 }  
 
 module.exports = {
+    createMemoryBallScene,
     createMemoryBall,
     getMemoryBallList,
     getMemoryBall,

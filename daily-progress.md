@@ -33,3 +33,7 @@ adjust the prompt and setting of calling gemini
 ### 13 Jun 2026
 
 added bcypt in user_controller, completed the update of the prompt
+
+### 17 Jun 2026
+
+flask with genAI act as microservice and link them in node.js

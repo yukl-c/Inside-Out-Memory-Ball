@@ -4,6 +4,8 @@ const verifyToken = require('../middlewares/auth');
 const memoryBallsController = require('../controllers/memory_balls_controller');
 const memoryBallsRouter = express.Router();
 
+memoryBallsRouter.post('/create-scene', verifyToken, memoryBallsController.createMemoryBallScene);
+
 memoryBallsRouter.get('/', verifyToken, memoryBallsController.getMemoryBallList);
 
 memoryBallsRouter.post('/:character_id', verifyToken, upload.single('memory_ball_photo'), memoryBallsController.createMemoryBall);

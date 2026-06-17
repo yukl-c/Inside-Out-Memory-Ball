@@ -18,16 +18,7 @@ print(api_key)
 app = Flask(__name__)
 
 @app.route('/api/generate-memory-ball-image', methods=['POST'])
-def generate_character_text():
-    # 1. 接收前端 Form / Input Fields 的資料
-    data = request.json
-
-    title = data.get('title', 'unknown')
-    scene_prompt = data.get('scene_prompt', '')
-    emotions = data.get('emotion', {})
-    character_image = data.get('character_image', None)
-    user_sketch_base64 = data.get('user_sketch_base64', None) 
-
+def post_memory_ball_image(title, scene_prompt, emotions, character_image_link, user_sketch_base64):
     # FIXED: Corrected indentation (4 spaces) to prevent IndentationError
     system_prompt = """
     You are an expert concept artist and psychological visualization engine. 
@@ -59,10 +50,10 @@ def generate_character_text():
     ]
     
     # FIXED: Added a check for character_image and decoded the base64 string to bytes
-    if character_image:
+    if character_image_link:
         contents_parts.append(
             types.Part.from_bytes(
-                data=base64.b64decode(character_image),
+                data=base64.b64decode(character_image_link),
                 mime_type="image/png" 
             )
         )

@@ -4,6 +4,8 @@ const verifyToken = require('../middlewares/auth');
 const charactersController = require('../controllers/characters_controller');
 const charactersRouter = express.Router();
 
+charactersRouter.post('/create-look', verifyToken, charactersController.createCharacterLook);
+
 charactersRouter.get('/', verifyToken, charactersController.getCharacterList);
 
 charactersRouter.post('/', verifyToken, upload.single('character_photo'), charactersController.createCharacter);

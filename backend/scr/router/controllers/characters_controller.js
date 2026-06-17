@@ -16,6 +16,111 @@ async function checkCharacter(characterId) {
 }
 exports.checkCharacter = checkCharacter;
 
+// 創建角色圖片描述
+async function createCharacterContentText (character_name, gender, species, style, description, user_sketch_base64) {
+    // const { character_name, gender, species, style, description, user_sketch_base64 } = req.body;
+
+    // if (!currentUserId || !character_name || !gender || !species) {
+    //     return errorMessage(res, 400, '創建角色内容失敗：缺少 user_id, character_name, gender 或 species 必填欄位');
+    // }
+
+    try {
+        const response =  await fetch(
+            'http://localhost:5000/api/generate-character-text',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    character_name: character_name, 
+                    gender: gender, 
+                    species: species, 
+                    style: style, 
+                    description: description, 
+                    user_sketch_base64: user_sketch_base64
+                })
+            }
+        )
+
+        const result = await response.json()
+        return result;
+
+        // if (createResult.status === 'success' ) {
+        //     return successMessage(res, 201, "Character context text creation succeeded", createResult.data)
+        // }   
+
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
+// 創建角色圖片
+async function createCharacterImage () {
+    const { character_prompt, user_sketch_base64 } = req.body;
+
+    if (!character_prompt) {
+        return errorMessage(res, 400, '創建角色内容失敗：缺少 character_prompt 必填欄位');
+    }
+
+    try {
+        const response = await fetch(
+            'http://localhost:5000/api/generate-character-image',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    character_prompt: character_prompt, 
+                    user_sketch_base64: user_sketch_base64
+                })
+            }
+        )
+
+        
+        const result = await response.json();
+        return result;
+
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
+// 創建角色外貌
+async function createCharacterLook (req, res) {
+    const { character_name, gender, species, style, description, user_sketch_base64 } = req.body;
+
+    if (!currentUserId || !character_name || !gender || !species) {
+        return errorMessage(res, 400, '創建角色内容失敗：缺少 user_id, character_name, gender 或 species 必填欄位');
+    }
+
+    try {
+        const textServiceResult = await createCharacterContentText(character_name, gender, species, style, description, user_sketch_base64);
+
+        if (textServiceResult.status !== 'success') {
+            return errorMessage(res, 522, 'Flask AI 文字生成微服務回應異常', textServiceResult.message);
+        }
+
+        const aiPromptTextData = JSON.parse(textServiceResult.data);
+        const characterPrompt = aiPromptTextData.character_prompt;
+
+        const imageServiceResult = await createCharacterImage(characterPrompt, user_sketch_base64)
+
+        if (imageServiceResult.status !== 'success') {
+            return errorMessage(res, 522, 'Flask AI 圖片生成微服務回應異常', imageServiceResult.message);
+        }
+
+        const aiPromptImageData = JSON.parse(imageServiceResult.data);
+        const characterLooksLink = aiPromptImageData.character_looks_link;
+
+        return successMessage(res, 201, 'Flask AI 圖片生成微服務成功', characterLooksLink); // only respond the character looks link
+
+    } catch (error) {
+        console.error(error);
+        return errorMessage(res, 500, 'Character look creation failed', error.message);
+    }
+}
+
+
 // ➕ 1. 創建角色
 async function createCharacter (req, res) {
     // 嚴格對照資料庫要求的必填欄位 (NOT NULL)
@@ -265,6 +370,7 @@ async function deleteCharacter (req, res) {
 }
 
 module.exports = {
+    createCharacterLook,
     createCharacter,
     getCharacterList,
     getCharacter,
