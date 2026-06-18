@@ -1,2 +1,3 @@
 backend/.env
 AI/app/config.py
+*.csv
