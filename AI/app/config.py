@@ -4,7 +4,7 @@ import google.genai as genai
 
 load_dotenv()
 
-api_key = "AQ.Ab8RN6J-qIjg_Vz_0Pog_IbuDGlf_0Gg6xAe45HEgljq-Ak8Hg"
+api_key = "AQ.Ab8RN6JSg6yXnhB0i3w0uue1wAAvhI7L9vf1bmWXa9yJ9bxQPw"
 # os.getenv("API_KEY") # 'AQ.Ab8RN6Ikmpf452zTGRimjueB8RuFhc5d1vV58oGSDhnPzXoQNQ'
 
 client = genai.Client(api_key= os.getenv("API_KEY"))
