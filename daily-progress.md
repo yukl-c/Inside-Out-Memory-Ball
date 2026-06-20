@@ -37,3 +37,7 @@ added bcypt in user_controller, completed the update of the prompt
 ### 17 Jun 2026
 
 flask with genAI act as microservice and link them in node.js
+
+### 21 Jun 2026
+
+For Character controllers, refactored code structure for improved readability and maintainability. Now file is enabled to pass to the gen ai part

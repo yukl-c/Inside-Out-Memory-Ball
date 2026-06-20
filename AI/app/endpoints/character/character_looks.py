@@ -1,8 +1,10 @@
+import io
 import os
 import sys
+import requests
+from PIL import Image
 from flask import Flask, render_template, request, jsonify
 from google import genai
-import google.genai as genai
 import base64
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -11,7 +13,7 @@ if root_path not in sys.path:
 
 from config import api_key, client, model_name_gen_image
 
-def post_character_image(character_prompt, user_sketch_base64):
+def post_character_image(character_prompt, image_file=None, user_sketch_url=None):
 
     # 這是給 Nano Banana 2 的系統視覺特質約束 (System Prompt)
     system_prompt = """
@@ -26,7 +28,8 @@ def post_character_image(character_prompt, user_sketch_base64):
     Create a professional full-body turnaround character concept sheet based on the following details:
     
     [Core Character Attributes]:
-    {character_prompt}
+    - Character prompt: {character_prompt}
+    - User sketch URL (if any): {user_sketch_url}
     
     [Required Layout Structure]:
     - Present the EXACT SAME character in two distinct full-body views split side-by-side within a single landscape image.
@@ -37,17 +40,32 @@ def post_character_image(character_prompt, user_sketch_base64):
     """
 
     contents_parts = [
-        genai.types.Part.from_text(text=user_text_prompt)
+        user_text_prompt
+        # genai.types.Part.from_text(text=user_text_prompt)
     ]
+
+    if image_file:
+        if isinstance(image_file, dict) and 'file' in image_file:
+            print("🤖 Gemini 偵測到實體草圖輸入，正在解析 Buffer...")
+            try:
+                file_bytes = image_file['file'][1]
+                img = Image.open(io.BytesIO(file_bytes))
+                contents_parts.append(img)
+            except Exception as img_err:
+                print(f"❌ PIL 解析圖片失敗: {str(img_err)}")
+
     
-    # 如果用家有畫畫，將用家畫的圖片 (Base64) 作為第二個 Part 塞進去
-    if user_sketch_base64:
-        contents_parts.append(
-            genai.types.Part.from_bytes(
-                data=user_sketch_base64,
-                mime_type="image/png" # 或是 image/jpeg
-            )
-        )
+    if user_sketch_url:
+         if isinstance(user_sketch_url, str) and user_sketch_url.startswith('http'):
+            print(f"🤖 Gemini 微服務偵測到 S3 圖片網址: {user_sketch_url}，正在非同步下載...")
+            try:
+                response = requests.get(user_sketch_url, stream=True)
+                if response.status_code == 200:
+                    img = Image.open(response.raw)
+                    contents_parts.append(img)
+            except Exception as net_err:
+                print(f"❌ 從 S3 下載圖片交給 Gemini 失敗: {str(net_err)}")
+
 
     try:
         # 呼叫 Nano Banana 2 製造圖片
@@ -57,7 +75,7 @@ def post_character_image(character_prompt, user_sketch_base64):
             config=genai.types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=1,
-                aspect_ratio="16:9",
+                image_config=genai.types.ImageConfig(aspect_ratio="16:9")
             )
         )
 
@@ -70,10 +88,13 @@ def post_character_image(character_prompt, user_sketch_base64):
         image_base64 = base64.b64encode(image_bytes).decode('utf-8')
         image_data_uri = f"data:image/png;base64,{image_base64}"
 
+        print("image in base64:", image_base64)
+
         # 回傳標準結構化 JSON 供前端 `<img src="...">` 直接讀取顯示
         return jsonify({
             "status": "success",
-            "character_looks_link": image_data_uri  # 這就是你需要的正面+背面 Base64 連結
+            # "character_looks_link": image_data_uri  # 這就是你需要的正面+背面 Base64 連結
+            "character_looks_base64": image_base64  # 這就是你需要的正面+背面 Base64
         })
 
     except Exception as e:

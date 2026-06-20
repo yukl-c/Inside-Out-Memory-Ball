@@ -1,8 +1,11 @@
+import io
 import os
 import sys
+import requests
+from PIL import Image
 from flask import Flask, render_template, request, jsonify
 from google import genai
-import google.genai as genai
+
 # app = Flask(__name__)
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -13,19 +16,8 @@ from config import api_key, client, model_name_gen_text
 
 # print(api_key)
 
-def post_character_text(character_name, gender, species, style, description, user_sketch_base64):
-    # 1. 接收前端 Form / Input Fields 的資料
-    # 假設前端發送的是 JSON Map
-    # data = request.json
-    
-    # character_name = data.get('character_name', 'Unknown')
-    # gender = data.get('gender', 'Unknown')
-    # species = data.get('species', 'Human')
-    # style = data.get('style', 'Pixar')
-    # description = data.get('description', '')
-    # user_sketch_base64 = data.get('user_sketch_base64', None) # 格式需為純 Base64 字串，不含 data:image/jpeg;base64,
+def post_character_text(character_name, gender, species, style, description, image_file=None, user_sketch_url=None):
 
-    # 2. 定義完整的 System Prompt (全部英文)
     system_prompt = """
     You are an expert AI Art Director and Prompt Engineer for character design. 
     Your task is to analyze the user's structured character data (gender, species, description) and the provided sketch image (if any).
@@ -56,17 +48,31 @@ def post_character_text(character_name, gender, species, style, description, use
     # 4. 建構給 Gemini SDK 的 Part 列表 (動態加入圖片)
     # 預設先把文字放進去
     contents_parts = [
-        genai.types.Part.from_text(text=user_text_prompt)
+        # genai.types.Part.from_text(text=user_text_prompt)
+        user_text_prompt
     ]
+
+    if image_file:
+        if isinstance(image_file, dict) and 'file' in image_file:
+            print("🤖 Gemini 偵測到實體草圖輸入，正在解析 Buffer...")
+            try:
+                file_bytes = image_file['file'][1]
+                img = Image.open(io.BytesIO(file_bytes))
+                contents_parts.append(img)
+            except Exception as img_err:
+                print(f"❌ PIL 解析圖片失敗: {str(img_err)}")
+
     
-    # 如果用家有畫畫，將用家畫的圖片 (Base64) 作為第二個 Part 塞進去
-    if user_sketch_base64:
-        contents_parts.append(
-            genai.types.Part.from_bytes(
-                data=user_sketch_base64,
-                mime_type="image/png" # 或是 image/jpeg
-            )
-        )
+    if user_sketch_url:
+         if isinstance(user_sketch_url, str) and user_sketch_url.startswith('http'):
+            print(f"🤖 Gemini 微服務偵測到 S3 圖片網址: {user_sketch_url}，正在非同步下載...")
+            try:
+                response = requests.get(user_sketch_url, stream=True)
+                if response.status_code == 200:
+                    img = Image.open(response.raw)
+                    contents_parts.append(img)
+            except Exception as net_err:
+                print(f"❌ 從 S3 下載圖片交給 Gemini 失敗: {str(net_err)}")
 
     try:
         print("API: ", api_key)
@@ -101,6 +107,7 @@ def post_character_text(character_name, gender, species, style, description, use
             })
 
     except Exception as e:
+        print(f" Gemini SDK 執行期間崩潰: {str(e)}")
         return jsonify({
             "status": "error",
             "message": str(e)

@@ -16,8 +16,8 @@ console.log(`region : ${(region)}`);
 const s3Client = new S3Client({
     region: region,
     credentials: {
-        accessKeyId: 'AKIAZ5ANEKAHXY2EM765', // accessKeyId,
-        secretAccessKey: '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' // secretAccessKey
+        accessKeyId: accessKeyId,
+        secretAccessKey: secretAccessKey
     },
 });
 
