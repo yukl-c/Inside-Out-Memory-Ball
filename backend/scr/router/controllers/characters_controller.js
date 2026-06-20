@@ -1,13 +1,18 @@
 const db = require('../config/db');
-const { uploadToS3, uploadAiUrlToS3, deleteFromS3 } = require('../config/s3');
+const axios = require('axios');
+const multer = require('multer');      
+const FormData = require('form-data');
+const { uploadToS3, uploadAiUrlToS3, uploadAiBase64ToS3, deleteFromS3 } = require('../config/s3');
 const successMessage = require('../utils/status_messages').successMessage;
 // exports.successMessage = successMessage;
 const errorMessage = require('../utils/status_messages').errorMessage;
 // exports.errorMessage = errorMessage;
 
-async function checkCharacter(characterId) {
+const upload = multer();
+
+async function checkCharacter(userId, characterId) {
     try {
-        const result = await db.query('SELECT * FROM characters WHERE character_id = $1 AND is_deleted = false', [characterId]);
+        const result = await db.query('SELECT * FROM characters WHERE character_id = $1 AND user_id = $2 AND is_deleted = false', [characterId, userId]);
         return [result.rows[0] !== undefined, result.rows[0]];
     } catch(err) {
         console.error(err);
@@ -17,67 +22,75 @@ async function checkCharacter(characterId) {
 exports.checkCharacter = checkCharacter;
 
 // 創建角色圖片描述
-async function createCharacterContentText (character_name, gender, species, style, description, user_sketch_base64) {
-    // const { character_name, gender, species, style, description, user_sketch_base64 } = req.body;
+async function createCharacterContentText (image_file=null, character_name, gender, species, style=null, description=null, user_sketch_url=null) {
+    const form = new FormData();
 
-    // if (!currentUserId || !character_name || !gender || !species) {
-    //     return errorMessage(res, 400, '創建角色内容失敗：缺少 user_id, character_name, gender 或 species 必填欄位');
-    // }
+    if (image_file && image_file.buffer) {
+        form.append('file', image_file.buffer, {
+            filename: image_file.originalname,
+            contentType: image_file.mimetype
+        });
+    }
+    
+
+    form.append('character_name', character_name);
+    form.append('gender', gender);
+    form.append('species', species);
+    form.append('style', style || 'Pixar');
+    form.append('description', description || '');
+    if (user_sketch_url) form.append('user_sketch_url', user_sketch_url);
 
     try {
-        const response =  await fetch(
+        const response = await axios.post(
             'http://localhost:5000/api/generate-character-text',
+            form,
             {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    character_name: character_name, 
-                    gender: gender, 
-                    species: species, 
-                    style: style, 
-                    description: description, 
-                    user_sketch_base64: user_sketch_base64
-                })
+                headers: {...form.getHeaders()}
             }
+
         )
 
-        const result = await response.json()
-        return result;
+        const character_prompt = JSON.parse(response.data.data).character_prompt;
+
+        console.log(`character prompt: ${character_prompt}`);
+        return response.data;
 
         // if (createResult.status === 'success' ) {
         //     return successMessage(res, 201, "Character context text creation succeeded", createResult.data)
         // }   
 
     } catch (error) {
-        console.error(error);
+        console.error("❌ 呼叫 Flask character文字生成服務失敗:", error);
         throw error;
     }
 }
 
 // 創建角色圖片
-async function createCharacterImage () {
-    const { character_prompt, user_sketch_base64 } = req.body;
+async function createCharacterImage (image_file=null, character_prompt, user_sketch_url=null) {
+    const form = new FormData();
 
-    if (!character_prompt) {
-        return errorMessage(res, 400, '創建角色内容失敗：缺少 character_prompt 必填欄位');
+    if (image_file && image_file.buffer) {
+        form.append('file', image_file.buffer, {
+            filename: image_file.originalname,
+            contentType: image_file.mimetype
+        });
     }
 
+    form.append('character_prompt', character_prompt);
+    if (user_sketch_url) form.append('user_sketch_url', user_sketch_url);
+
     try {
-        const response = await fetch(
+        const response = await axios.post(
             'http://localhost:5000/api/generate-character-image',
+            form,
             {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    character_prompt: character_prompt, 
-                    user_sketch_base64: user_sketch_base64
-                })
+                headers: {...form.getHeaders()}
             }
+
         )
 
-        
-        const result = await response.json();
-        return result;
+        console.log('image base 64: ',response.data.character_looks_base64);
+        return response.data;
 
     } catch (error) {
         console.error(error);
@@ -87,35 +100,51 @@ async function createCharacterImage () {
 
 // 創建角色外貌
 async function createCharacterLook (req, res) {
-    const { character_name, gender, species, style, description, user_sketch_base64 } = req.body;
+    const { character_name, gender, species, style, description, user_sketch_url } = req.body;
 
-    if (!currentUserId || !character_name || !gender || !species) {
-        return errorMessage(res, 400, '創建角色内容失敗：缺少 user_id, character_name, gender 或 species 必填欄位');
+    const image_file = req.file || null;
+
+    if (!character_name || !gender || !species) {
+        return errorMessage(res, 400, '創建角色内容失敗：缺少 character_name, gender 或 species 必填欄位');
     }
 
     try {
-        const textServiceResult = await createCharacterContentText(character_name, gender, species, style, description, user_sketch_base64);
+        const textServiceResult = await createCharacterContentText(
+            image_file, 
+            character_name, 
+            gender, 
+            species, 
+            style, 
+            description,  
+            user_sketch_url
+        );
 
         if (textServiceResult.status !== 'success') {
             return errorMessage(res, 522, 'Flask AI 文字生成微服務回應異常', textServiceResult.message);
         }
 
-        const aiPromptTextData = JSON.parse(textServiceResult.data);
+        const aiPromptTextData = typeof textServiceResult.data === 'string' ? JSON.parse(textServiceResult.data) : textServiceResult.data;        
         const characterPrompt = aiPromptTextData.character_prompt;
 
-        const imageServiceResult = await createCharacterImage(characterPrompt, user_sketch_base64)
+        const imageServiceResult = await createCharacterImage(image_file, characterPrompt, user_sketch_url)
 
+        console.log(`imageServiceResult: ${JSON.stringify(imageServiceResult.status)}`)
         if (imageServiceResult.status !== 'success') {
-            return errorMessage(res, 522, 'Flask AI 圖片生成微服務回應異常', imageServiceResult.message);
+            return errorMessage(res, 522, 'Flask AI character 圖片生成微服務回應異常', imageServiceResult.message);
         }
 
-        const aiPromptImageData = JSON.parse(imageServiceResult.data);
-        const characterLooksLink = aiPromptImageData.character_looks_link;
+        // const aiPromptImageData = typeof imageServiceResult.data === 'string' ? JSON.parse(imageServiceResult) : imageServiceResult;
+        // console.log(`AI prompt image data: ${aiPromptImageData}`);
+        const characterLooksBase64 = imageServiceResult.character_looks_base64;
 
-        return successMessage(res, 201, 'Flask AI 圖片生成微服務成功', characterLooksLink); // only respond the character looks link
+        if (!characterLooksBase64) {
+            return errorMessage(res, 522, 'Flask AI 服務異常：未成功取得圖片 Base64 數據');
+        }
+
+        return successMessage(res, 201, 'Flask AI character 圖片生成微服務成功', characterLooksBase64); // only respond the character looks link
 
     } catch (error) {
-        console.error(error);
+        console.error("🚨 串聯 AI 微服務時發生崩潰:", error);
         return errorMessage(res, 500, 'Character look creation failed', error.message);
     }
 }
@@ -124,7 +153,8 @@ async function createCharacterLook (req, res) {
 // ➕ 1. 創建角色
 async function createCharacter (req, res) {
     // 嚴格對照資料庫要求的必填欄位 (NOT NULL)
-    const { character_name, gender, species, style, description, ai_generated_url } = req.body;
+    // const { character_name, gender, species, style, description, ai_generated_url } = req.body;
+    const { character_name, gender, species, style, description, ai_generated_base64 } = req.body;
     const currentUserId = req.user.userId;
 
     // 🔒 400 食材安檢 (必填欄位檢查 + return 阻斷)
@@ -132,7 +162,8 @@ async function createCharacter (req, res) {
         return errorMessage(res, 400, '創建角色失敗：缺少 user_id, character_name, gender 或 species 必填欄位');
     }
 
-    if (!ai_generated_url) {
+    // if (!ai_generated_url) {
+    if (!ai_generated_base64) {   
         return errorMessage(res, 400, '創建角色失敗：必須提供 Gemini AI 圖片網址 (ai_generated_url)');
     }
 
@@ -152,7 +183,8 @@ async function createCharacter (req, res) {
             uploadedcharacterPhotoS3Key = characterPhotoS3Result.s3Key;
         }
 
-        const CharacterLooksS3Result = await uploadAiUrlToS3(ai_generated_url, 'character-looks');
+        // const CharacterLooksS3Result = await uploadAiUrlToS3(ai_generated_url, 'character-looks');
+        const CharacterLooksS3Result = await uploadAiBase64ToS3(ai_generated_base64, 'character-looks');
         characterLooksLink = CharacterLooksS3Result.imageUrl;
         console.log("📤 AI 生成的圖片已成功儲存在 S3，連結如下：", characterLooksLink);
         uploadedcharacterLooksS3Key = CharacterLooksS3Result.s3Key;
@@ -197,10 +229,12 @@ async function getCharacterList (req, res) {
 
 // 🔍 3. 獲取單一角色
 async function getCharacter (req, res) {
+    const currentUserId = req.user.userId;
+
     const characterId = req.params.character_id;
 
     try {
-        const checkResult = await checkCharacter(characterId);
+        const checkResult = await checkCharacter(currentUserId, characterId);
         
         // 🔒 404 檢查（修正你原本寫法在 try 外面且變數名稱錯植的隱患）
         if (!checkResult[0]) {
@@ -217,7 +251,8 @@ async function getCharacter (req, res) {
 // ✏️ 4. 更新角色資料（同步連貫 S3 安全清理機制）
 async function updateCharacter (req, res) {
     const characterId = req.params.character_id;
-    const { character_name, gender, species, style, description, ai_generated_url } = req.body;
+    // const { character_name, gender, species, style, description, ai_generated_url } = req.body;
+    const { character_name, gender, species, style, description, ai_generated_base64 } = req.body;
 
     // 🔒 400 食材安檢一：必填欄位檢查
     if (!character_name || !gender || !species) {
@@ -226,7 +261,8 @@ async function updateCharacter (req, res) {
 
     // 🔒 400 食材安檢二：延續你的業務邏輯，更新時如果傳了新資料，ai_generated_url 是否也是必填？
     // 💡 註：這裡假設更新時也必須帶著最新的 ai_generated_url 網址。
-    if (!ai_generated_url) {
+    // if (!ai_generated_url) {
+    if (!ai_generated_base64) {
         return errorMessage(res, 400, '更新角色失敗：必須提供 Gemini AI 圖片網址 (ai_generated_url)');
     }
 
@@ -276,10 +312,13 @@ async function updateCharacter (req, res) {
         } 
 
         // 🤖 步驟 3：處理最新的 Gemini AI 圖片網址並轉存
-        console.log("🤖 啟動新 AI 網址轉存 S3 流程...");
-        const CharacterLooksS3Result = await uploadAiUrlToS3(ai_generated_url, 'character-looks');
-        characterLooksLink = CharacterLooksS3Result.imageUrl;
-        uploadedNewLooksS3Key = CharacterLooksS3Result.s3Key; // 🔍 紀錄新 Key！
+        if (ai_generated_base64) {
+            console.log("🤖 啟動新 AI 網址轉存 S3 流程...");
+            const CharacterLooksS3Result = await uploadAiBase64ToS3(ai_generated_base64, 'character-looks');
+            characterLooksLink = CharacterLooksS3Result.imageUrl;
+            uploadedNewLooksS3Key = CharacterLooksS3Result.s3Key; // 🔍 紀錄新 Key！
+        }
+        
 
         const updated_at = new Date();
 

@@ -8,6 +8,7 @@ const storage = multer.memoryStorage();
 // 2. 限制上傳檔案的條件 (食材安檢：防止用戶傳太大的檔案或奇怪的格式)
 const limits = {
     fileSize: 5 * 1024 * 1024, // 🛑 限制檔案大小最大為 5MB
+    fieldSize: 25 * 1024 * 1024 // 🛑 限制輸入大小最大為 5MB
 };
 
 // 3. 檔案類型過濾器 (File Filter)

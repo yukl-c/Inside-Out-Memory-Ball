@@ -1,5 +1,6 @@
 // config/s3.js (升級版)
 const { S3Client, ListBucketsCommand, HeadBucketCommand, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const multer = require('multer');
 const axios = require('axios');
 
@@ -13,38 +14,41 @@ console.log(`bucket name : ${(s3Bucket)}`);
 console.log(`region : ${(region)}`);
 
 const s3Client = new S3Client({
-    region: 'us-east-1',
+    region: region,
     credentials: {
-        accessKeyId: accessKeyId,
-        secretAccessKey: secretAccessKey
-    }
+        accessKeyId: 'AKIAZ5ANEKAHXY2EM765', // accessKeyId,
+        secretAccessKey: '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' // secretAccessKey
+    },
 });
 
-async function verifySpecificBucket() {
-  try {
-    // 2. Send a lightweight request to AWS
-    const command = new ListBucketsCommand({});
-    const response = await s3Client.send(command);
+// async function verifyBuckets() {
+//   try {
+//     // 2. Send a lightweight request to AWS
+//     const command = new ListBucketsCommand({});
+//     const response = await s3Client.send(command);
     
-    console.log("✅ S3 連線成功！");
-    console.log(`在此帳戶中找到 ${response.Buckets.length} 個儲存桶。`);
-  } catch (err) {
-    console.error("❌ S3 連線失敗！原因：", err.message, err.$metadata?.httpStatusCode);
-  }
-}
+//     console.log("✅ S3 連線成功！");
+//     console.log(`在此帳戶中找到 ${response.Buckets.length} 個儲存桶。`);
+//   } catch (err) {
+//     // console.error("❌ S3 連線失敗！原因：", err.message, err.$metadata?.httpStatusCode);
+//     console.error(err);
+//   }
+// }
 
 async function verifySpecificBucket(bucketName) {
   try {
     const command = new HeadBucketCommand({ Bucket: bucketName });
     await s3Client.send(command);
     console.log(`✅ 已成功連接到儲存桶： ${bucketName}`);
-  } catch (error) {
+  } catch (err) {
     console.error(`❌ 連接到儲存桶失敗： ${bucketName}！原因：${err.message} ${err.$metadata?.httpStatusCode}`);
   }
 }
 
 // checkS3Connection();
 verifySpecificBucket(s3Bucket);
+// verifyBuckets();
+
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -131,4 +135,52 @@ const uploadAiUrlToS3 = async (aiImageUrl, folderName) => {
     }
 };
 
-module.exports = { upload, uploadToS3, deleteFromS3, uploadAiUrlToS3 };
+const uploadAiBase64ToS3 = async (aiImageBase64, folderName) => {
+    try {
+        console.log(`正在嘗試從base 64下載 AI 圖片: ${aiImageBase64}`);
+
+        const matches = aiImageBase64.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+        
+        let type = "jpeg"; 
+        let pureBase64String = aiImageBase64;
+
+        if (matches) {
+            // split from base64
+            type = matches[1]; // image format
+            pureBase64String = matches[2]; // base64 data
+        } else {
+            console.log("📝 偵測到純 Base64 格式，將使用預設 image/jpeg 格式儲存");
+        }
+
+        // 2. 💡 修正點：將純 Base64 字串轉化為記憶體中的二進位 Buffer
+        const base64Buffer = Buffer.from(pureBase64String, 'base64');
+
+        // 製造唯一的檔案名稱
+        const uniqueFileName = `${folderName}/ai_${Date.now()}.${type}`;
+        
+        const params = {
+            Bucket: s3Bucket,
+            Key: uniqueFileName,
+            Body: base64Buffer,          
+            ContentType: `image/${type}`
+        };
+
+        // 🚀 4. 發送指令上傳到 AWS S3
+        await s3Client.send(new PutObjectCommand(params));
+
+        return {
+            imageUrl: `https://${params.Bucket}.s3.${region}.amazonaws.com/${uniqueFileName}`,
+            s3Key: uniqueFileName
+        };
+    } catch (error) {
+        // 💡 印出更詳細的錯誤日誌，方便你 debug
+        if (error.response) {
+            console.error(`❌ 下載失敗！對方伺服器回應狀態碼: ${error.response.status}`);
+        }
+        console.error("🚨 【S3 轉存 AI 圖片失敗】:", error.message);
+        throw new Error(`無法將 AI 圖片轉存至 S3: ${error.message}`);
+    }
+};
+
+
+module.exports = { upload, uploadToS3, deleteFromS3, uploadAiUrlToS3, uploadAiBase64ToS3 };

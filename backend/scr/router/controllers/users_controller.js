@@ -68,7 +68,7 @@ async function login (req, res) {
                 const token = jwt.sign(
                     { userId: currentUserId }, 
                     process.env.JWT_SECRET, 
-                    { expiresIn: '2h' }
+                    { expiresIn: '24h' }
                 );
 
                 const exist_user = loginResult.rows[0]
@@ -159,7 +159,7 @@ async function updatePassword (req, res) {
 
         const PreviousHashedPassword = checkResult.rows[0].password;
 
-        const isMatch = bcrypt.compareSync(password, PreviousHashedPassword);
+        const isMatch = bcrypt.compareSync(old_password, PreviousHashedPassword);
         
         if (!isMatch) {
             return errorMessage(res, 404, `舊密碼錯誤`);
