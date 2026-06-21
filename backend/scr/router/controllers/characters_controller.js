@@ -53,11 +53,7 @@ async function createCharacterContentText (image_file=null, character_name, gend
         const character_prompt = JSON.parse(response.data.data).character_prompt;
 
         console.log(`character prompt: ${character_prompt}`);
-        return response.data;
-
-        // if (createResult.status === 'success' ) {
-        //     return successMessage(res, 201, "Character context text creation succeeded", createResult.data)
-        // }   
+        return response.data; 
 
     } catch (error) {
         console.error("❌ 呼叫 Flask character文字生成服務失敗:", error);
@@ -133,8 +129,6 @@ async function createCharacterLook (req, res) {
             return errorMessage(res, 522, 'Flask AI character 圖片生成微服務回應異常', imageServiceResult.message);
         }
 
-        // const aiPromptImageData = typeof imageServiceResult.data === 'string' ? JSON.parse(imageServiceResult) : imageServiceResult;
-        // console.log(`AI prompt image data: ${aiPromptImageData}`);
         const characterLooksBase64 = imageServiceResult.character_looks_base64;
 
         if (!characterLooksBase64) {
@@ -152,7 +146,6 @@ async function createCharacterLook (req, res) {
 
 // ➕ 1. 創建角色
 async function createCharacter (req, res) {
-    // 嚴格對照資料庫要求的必填欄位 (NOT NULL)
     // const { character_name, gender, species, style, description, ai_generated_url } = req.body;
     const { character_name, gender, species, style, description, ai_generated_base64 } = req.body;
     const currentUserId = req.user.userId;
